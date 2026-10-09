@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>タンパク質コスパ判定</title>
+<meta name="theme-color" content="#EEF2F1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F1; --paper:#FFFFFF; --ink:#16201E; --sub:#5B6866; --line:#CBD5D3;
+  --good:#1E9E6A; --mid:#D9A21B; --bad:#D4503E; --mark:#16201E;
+  --sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --num:"Barlow Condensed","Zen Kaku Gothic New",system-ui,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#101716; --paper:#18211F; --ink:#E6EDEB; --sub:#97A5A2; --line:#2E3A38;
+  --good:#3CC48A; --mid:#E8B636; --bad:#EE6E5C; --mark:#E6EDEB;}}
+:root[data-theme="dark"]{--bg:#101716; --paper:#18211F; --ink:#E6EDEB; --sub:#97A5A2; --line:#2E3A38;
+  --good:#3CC48A; --mid:#E8B636; --bad:#EE6E5C; --mark:#E6EDEB;}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%}
+body{margin:0;overflow-wrap:anywhere;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+main{max-width:720px;margin:0 auto;padding:28px 18px 48px}
+h1{font-size:1.5rem;font-weight:900;letter-spacing:.02em;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 24px;font-size:.92rem}
+.inputs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px}
+.inputs .wide{grid-column:1/-1}
+label{display:block;font-size:.82rem;color:var(--sub);margin-bottom:4px;font-weight:500}
+.field{display:flex;align-items:baseline;min-width:0;border-bottom:2px solid var(--line);transition:border-color .15s}
+.field:focus-within{border-color:var(--ink)}
+input{flex:1;min-width:0;width:100%;border:0;background:transparent;color:var(--ink);font-family:var(--num);font-size:2.2rem;font-weight:700;padding:2px 0;outline:none}
+input.text{font-family:var(--sans);font-size:1.05rem;font-weight:500;padding:8px 0}
+input::placeholder{color:var(--line)}
+.unit{color:var(--sub);font-size:.95rem;margin-left:6px}
+.result{margin-top:22px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 18px}
+.empty{color:var(--sub);text-align:center;padding:26px 0;margin:0}
+.score-row{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.score{font-family:var(--num);font-weight:700;font-size:5.6rem;line-height:.9;letter-spacing:-.01em}
+.score small{font-size:1.4rem;color:var(--sub);margin-left:2px}
+.grade{display:inline-block;font-family:var(--num);font-weight:700;font-size:1.6rem;color:#fff;border-radius:8px;padding:0 12px;margin-bottom:8px}
+.verdict{flex:1;min-width:200px;padding-bottom:6px}
+.verdict p{margin:0}
+.verdict .yen{font-family:var(--num);font-size:1.5rem;font-weight:700}
+.verdict .note{color:var(--sub);font-size:.88rem}
+/* the scale: every product as a tick on one axis */
+.scale{margin:26px 0 6px;position:relative}
+.scale-cap{display:flex;justify-content:space-between;font-size:.78rem;color:var(--sub);margin-bottom:6px}
+.track{position:relative;height:46px;border-radius:8px;background:linear-gradient(90deg,var(--good),var(--mid) 45%,var(--bad));opacity:.18}
+.ticks{position:absolute;inset:0}
+.tick{position:absolute;top:8px;width:2px;height:30px;background:var(--ink);opacity:.28;border-radius:1px;transform:translateX(-1px)}
+.tick.near{opacity:.9;background:var(--ink)}
+.you{position:absolute;top:-6px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none;transition:left .35s cubic-bezier(.2,.8,.2,1)}
+.you span{background:var(--mark);color:var(--paper);font-size:.72rem;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.you i{width:3px;height:44px;background:var(--mark);border-radius:2px}
+.axis{position:relative;height:18px;font-family:var(--num);font-size:.85rem;color:var(--sub);margin-top:4px}.axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}.axis span:first-child{transform:none}.axis span:last-child{transform:translateX(-100%)}.axis-unit{text-align:right;font-size:.75rem;color:var(--sub)}
+h2{font-size:1.02rem;font-weight:700;margin:28px 0 10px}
+.near-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.near-list li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.near-list li:hover{background:color-mix(in srgb,var(--line) 30%,transparent)}
+.near-list li:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.nm{font-weight:500}
+.cat{color:var(--sub);font-size:.8rem}
+.nv{text-align:right;font-family:var(--num);font-size:1.15rem;font-weight:700;white-space:nowrap}
+.nd{text-align:right;color:var(--sub);font-size:.8rem;white-space:nowrap}
+.hint{color:var(--sub);font-size:.8rem;margin-top:14px}
+.btn{font-family:var(--sans);font-size:.95rem;font-weight:700;border-radius:10px;padding:10px 16px;cursor:pointer;border:2px solid var(--ink);background:var(--ink);color:var(--paper)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible{outline:3px solid var(--good);outline-offset:2px}
+.save-row{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}
+.status{color:var(--sub);font-size:.85rem}
+.log{margin-top:22px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px}
+.log-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.log h2{margin:0}
+.table-wrap{overflow-x:auto;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:520px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--sub);font-weight:500;font-size:.8rem}
+td.n{text-align:right;font-family:var(--num);font-size:1rem}
+td.name{white-space:normal;min-width:140px}
+.del{background:none;border:0;color:var(--sub);cursor:pointer;font-size:.8rem;padding:4px 6px;border-radius:6px}
+.del:hover{color:var(--bad)}
+.del:focus-visible{outline:2px solid var(--ink)}
+footer{color:var(--sub);font-size:.78rem;margin-top:30px;line-height:1.7}
+@media (max-width:480px){.score{font-size:4.6rem}}
+@media (max-width:520px){
+  table{min-width:0}
+  thead{display:none}
+  table,tbody,tr,td{display:block}
+  tr{display:grid;grid-template-columns:1fr auto;column-gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  td{border:0;padding:1px 0;text-align:left!important;white-space:normal}
+  td:nth-child(1){grid-column:1;grid-row:1;color:var(--sub);font-size:.78rem}
+  td:nth-child(2){grid-column:1;grid-row:2;font-weight:500}
+  td:nth-child(3),td:nth-child(4),td:nth-child(5){grid-column:1;display:inline;font-size:.85rem;color:var(--sub);font-family:var(--sans)}
+  td:nth-child(3){grid-row:3}
+  td:nth-child(3)::after{content:"・"}
+  td:nth-child(4)::after{content:"・"}
+  td:nth-child(5)::after{content:"円/g"}
+  td:nth-child(6){grid-column:2;grid-row:1 / span 2;align-self:center;font-size:1.4rem;text-align:right!important}
+  td:nth-child(7){display:none}
+  td:nth-child(8){grid-column:2;grid-row:3;text-align:right!important}
+}
+@media (prefers-reduced-motion:reduce){.you{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>タンパク質コスパ判定</h1>
+<p class="lead">値段とタンパク質量を入れると、ファミマ107商品と比べたコスパ点数が出ます。</p>
+
+<section class="inputs" aria-label="商品の入力">
+  <div class="wide">
+    <label for="name">商品名（任意）</label>
+    <div class="field"><input id="name" class="text" type="text" placeholder="例：ザバス ミルクプロテイン" autocomplete="off"></div>
+  </div>
+  <div>
+    <label for="price">税込価格</label>
+    <div class="field"><input id="price" type="number" inputmode="decimal" min="0" step="1" placeholder="0"><span class="unit">円</span></div>
+  </div>
+  <div>
+    <label for="protein">タンパク質</label>
+    <div class="field"><input id="protein" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0"><span class="unit">g</span></div>
+  </div>
+</section>
+
+<section class="result" id="result" aria-live="polite">
+  <p class="empty">値段とタンパク質量を入れてください</p>
+</section>
+
+<section class="log" aria-label="記録した商品">
+  <div class="log-head">
+    <h2>記録した商品</h2>
+    <button class="btn ghost" id="dl" hidden>Excelでダウンロード</button>
+  </div>
+  <div id="log"><p class="empty">まだ記録はありません。判定したあと「この商品を記録」を押すと、ここに貯まります。</p></div>
+  <p class="status" id="dlstatus" role="status"></p>
+</section>
+
+<footer>
+点数は「1gあたりの値段が、比較対象の何%の商品より安いか」です（100点＝全商品より安い、50点＝ちょうど真ん中）。<br>
+記録はこの端末のブラウザ内に保存されます（他の端末とは共有されません）。<br>比較データ：ファミリーマート公式サイトの価格・栄養成分（2026年10月時点、税込通常価格）。サラダ・おむすび・ホットスナック・高たんぱくのチルド惣菜・プロテインなど107品。地域や時期で価格は変わります。
+</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const DATA = [["鶏つくね串", "ホットスナック", 189, 14.5], ["国産鶏のサラダチキン 3種のハーブ&スパイス", "チルド惣菜（高たんぱく）", 298, 22.6], ["国産鶏のサラダチキン スモーク", "チルド惣菜（高たんぱく）", 298, 22.3], ["グリルチキン ブラックペッパー", "チルド惣菜（高たんぱく）", 268, 19.9], ["マイプロテインバー イチゴ風味（42g）", "プロテイン", 218, 15.9], ["国産鶏のサラダチキン てりやき味", "チルド惣菜（高たんぱく）", 298, 21.1], ["マイプロテイン プロテインドリンク チョコレート風味（330ml）", "プロテイン", 213, 15], ["Wペッパーつくね串", "ホットスナック", 189, 13.3], ["ファミから（塩）1個", "ホットスナック", 108, 7.6], ["国産鶏のサラダチキン 淡路島の藻塩", "チルド惣菜（高たんぱく）", 298, 20.8], ["グリルチキン 炭火やきとり風味", "チルド惣菜（高たんぱく）", 268, 18.2], ["ファミから（醤油）1個", "ホットスナック", 108, 7.3], ["国産鶏のサラダチキン タンドリーチキン風", "チルド惣菜（高たんぱく）", 298, 19.9], ["グリルチキンスモーク（関東）", "チルド惣菜（高たんぱく）", 258, 16.4], ["グリルチキン ゆず七味", "チルド惣菜（高たんぱく）", 268, 16.7], ["クリスピーチキン（プレーン）", "ホットスナック", 198, 12.2], ["サラダチキンスティック 3種のハーブ&スパイス", "チルド惣菜（高たんぱく）", 198, 12.2], ["サラダチキンスティック アルペンザルツ岩塩", "チルド惣菜（高たんぱく）", 198, 12.2], ["かむほど旨いあたりめ（14g）", "お菓子・おつまみ", 158, 9.3], ["豆腐スティック きんぴらごぼう", "チルド惣菜（高たんぱく）", 198, 11.6], ["ジャンボフランク", "ホットスナック", 198, 11.5], ["ファミチキ（レッド）", "ホットスナック", 258, 14.9], ["グリルチキン 焦がしねぎ塩", "チルド惣菜（高たんぱく）", 268, 15.1], ["豆腐スティック 蓮根と枝豆", "チルド惣菜（高たんぱく）", 205, 11.5], ["鶏ももステーキ ペッパー&ガーリック", "チルド惣菜（高たんぱく）", 298, 16.6], ["たんぱく質が摂れる！サラダチキンロール", "サンドイッチ", 430, 23.7], ["炭火焼きとり もも（塩）", "ホットスナック", 150, 8.1], ["サラダチキンバー 3種のチーズ", "チルド惣菜（高たんぱく）", 198, 10.6], ["サラダチキンスティック スモーク", "チルド惣菜（高たんぱく）", 198, 10.6], ["ファミチキ（ごま山椒味）", "ホットスナック", 258, 13.5], ["炭火焼きとり もも（タレ）", "ホットスナック", 150, 7.7], ["ファミチキ", "ホットスナック", 248, 12.7], ["サラダチキンバー トマトバジルチーズ", "チルド惣菜（高たんぱく）", 198, 10.1], ["グリルチキン 梅ゆかり®", "チルド惣菜（高たんぱく）", 278, 13.8], ["国産鶏ささみ スモーク", "チルド惣菜（高たんぱく）", 198, 9.8], ["アメリカンドッグ", "ホットスナック", 150, 7], ["スパイシーチキン", "ホットスナック", 220, 9.5], ["揚げかまぼこスティック いか&しょうが入り", "チルド惣菜（高たんぱく）", 190, 8.1], ["海鮮スティック 博多明太入りマヨネーズ", "チルド惣菜（高たんぱく）", 184, 7.5], ["たんぱく質が摂れる！鶏むね肉とたまごのサラダ", "サラダ", 498, 20.2], ["炭火焼きとり かわ（タレ）", "ホットスナック", 150, 5.9], ["チーズかまぼこ 4種のチーズ", "チルド惣菜（高たんぱく）", 203, 7.8], ["たんぱく質が摂れる！ローストチキンのパスタサラダ", "サラダ", 398, 15.2], ["炭火焼きとり かわ（塩）", "ホットスナック", 150, 5.7], ["タンスティック 濃厚4種のチーズ", "チルド惣菜（高たんぱく）", 208, 7.7], ["タンスティック 瀬戸内レモン", "チルド惣菜（高たんぱく）", 208, 7.7], ["海鮮スティック プレーン", "チルド惣菜（高たんぱく）", 185, 6.7], ["豚しゃぶのパスタサラダ", "サラダ", 398, 13], ["サラダチキンのサラダ", "サラダ", 288, 9.4], ["タンスティック ねぎ塩", "チルド惣菜（高たんぱく）", 208, 6.7], ["ファミコロ（サクッと衣の牛肉コロッケ）", "ホットスナック", 120, 3.8], ["海鮮スティック チーズクリーム入り", "チルド惣菜（高たんぱく）", 190, 5.6], ["ごま香る！担担風パスタサラダ", "サラダ", 429, 12.5], ["ねぎ塩チキンのパスタサラダ", "サラダ", 538, 15.5], ["麻辣チキンと豆腐かんすのサラダ", "サラダ", 628, 16.6], ["たんぱく質が摂れる！豚しゃぶのサラダ", "サラダ", 498, 13.1], ["直巻 とり五目", "おむすび", 187, 4.9], ["もち麦・スーパー大麦 枝豆チーズ", "おむすび", 198, 4.9], ["直巻 和風ツナマヨネーズ", "おむすび", 174, 4.3], ["おむすび3個のミニ弁当", "おむすび", 498, 12.3], ["グリルチキンとゆで玉子のファーマーズサラダ", "サラダ", 628, 15.5], ["SPAM®むすび ツナマヨネーズ", "おむすび", 298, 7.3], ["直巻 焼しゃけ", "おむすび", 187, 4.5], ["ハムとマカロニのサラダ", "サラダ", 278, 6.4], ["サンドおむすび 背徳チーズソース牛めし", "おむすび", 358, 7.7], ["シーチキン&たまごのサラダ", "サラダ", 298, 6.4], ["SPAM®むすび スクランブルエッグ", "おむすび", 398, 8.5], ["具だくさん！だし玉子焼と明太子", "おむすび", 228, 4.7], ["ごちむすび 鮭はらみ", "おむすび", 298, 6.1], ["青じそ香る！たらこのパスタサラダ", "サラダ", 429, 8.7], ["もち麦 新生姜とわかめ", "おむすび", 168, 3.4], ["大きなおむすび 鶏そぼろ", "おむすび", 298, 6], ["手巻 シーチキン®マヨネーズ", "おむすび", 198, 3.8], ["ぼんご監修 大きなおむすび まぐろたくあんと卵黄醤油だれ", "おむすび", 321, 6.1], ["大きなおむすび 昆布とツナマヨネーズ", "おむすび", 298, 5.5], ["おむすびおかずセット（昆布・ツナマヨネーズ）", "おむすび", 450, 8.3], ["直巻 明太子マヨネーズ", "おむすび", 187, 3.4], ["紅鮭ほぐしと生たらこおむすび", "おむすび", 298, 5.4], ["青磯海苔 あさり旨煮", "おむすび", 238, 4.3], ["大きなおむすび 塩おむすび", "おむすび", 189, 3.4], ["具だくさん！かき揚げ", "おむすび", 228, 4], ["塩おむすび", "おむすび", 149, 2.6], ["手巻 紅しゃけ", "おむすび", 235, 4.1], ["高菜たくあんおむすび", "おむすび", 158, 2.7], ["北海道産昆布 ごま昆布おむすび", "おむすび", 158, 2.7], ["手巻 辛子明太子", "おむすび", 235, 4], ["1/3日分の野菜サラダ", "サラダ", 348, 5.9], ["炙り焼 牛ハラミおむすび", "おむすび", 240, 4], ["【熊本うまかモン集合】大きなおむすび 海苔佃煮", "おむすび", 278, 4.6], ["梅（おかか入り）おむすび", "おむすび", 158, 2.6], ["手巻 真昆布", "おむすび", 198, 3.2], ["手巻 紀州南高梅", "おむすび", 198, 3.2], ["なす味噌おむすび", "おむすび", 198, 3.2], ["おむすび2個セット（鮭・ツナマヨネーズ）", "おむすび", 388, 5.9], ["パリパリ麺サラダ", "サラダ", 429, 6.5], ["砕いて食べる！タコス風サラダ", "サラダ", 450, 6.5], ["ナンプラー香る5種の雑穀と野菜ライスサラダ", "サラダ", 420, 5.9], ["海老マヨのサラダ", "サラダ", 468, 6.2], ["ハッシュドポテト", "ホットスナック", 145, 1.4], ["ころじゃが（うま塩味）", "ホットスナック", 230, 2.2], ["高リコピントマトとわかめのサラダ", "サラダ", 298, 2.8], ["チョレギサラダ", "サラダ", 321, 2.6], ["3種のネバネバサラダ", "サラダ", 348, 2.6], ["まいたけとベーコンのサラダ", "サラダ", 429, 3.2], ["フレッシュ野菜サラダ", "サラダ", 198, 1.1], ["野菜スティック（味噌マヨ）", "サラダ", 298, 1.5], ["大盛！野菜スティック（生七味マヨ）", "サラダ", 398, 2]].map(([name,cat,price,p])=>({name,cat,price,p,ypg:price/p}));
+const sorted = [...DATA].sort((a,b)=>a.ypg-b.ypg);
+const MIN = 10, MAX = 60; // axis range in 円/g (log scale)
+const pos = v => {const c=Math.min(Math.max(v,MIN),MAX);return (Math.log(c)-Math.log(MIN))/(Math.log(MAX)-Math.log(MIN))*100;};
+const scoreOf = ypg => {
+  let worse=0, eq=0;
+  for (const d of DATA){ if (d.ypg>ypg+1e-9) worse++; else if (Math.abs(d.ypg-ypg)<=1e-9) eq++; }
+  return Math.round((worse+eq*0.5)/DATA.length*100);
+};
+const gradeOf = s => s>=90?["S","var(--good)"]:s>=70?["A","var(--good)"]:s>=50?["B","var(--mid)"]:s>=30?["C","var(--mid)"]:["D","var(--bad)"];
+const verdictOf = s => s>=90?"サラダチキン級。タンパク質源としてかなり優秀です":
+  s>=70?"コスパ良好。普段使いのタンパク質源に向いています":
+  s>=50?"平均よりやや良い程度です":
+  s>=30?"やや割高。タンパク質目当てなら他を検討":"割高。タンパク質はおまけと考えた方がよさそうです";
+const fmt = n => n.toLocaleString("ja-JP",{maximumFractionDigits:1,minimumFractionDigits:1});
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const $ = id => document.getElementById(id);
+const out = $("result");
+
+function render(){
+  const price = parseFloat($("price").value), p = parseFloat($("protein").value);
+  const name = $("name").value.trim() || "入力した商品";
+  if (!(price>0) || !(p>0)){
+    out.innerHTML = '<p class="empty">'+(($("price").value||$("protein").value)?"値段とタンパク質量はどちらも0より大きい数で入れてください":"値段とタンパク質量を入れてください")+'</p>';
+    return;
+  }
+  const ypg = price/p, s = scoreOf(ypg), [g,col] = gradeOf(s);
+  const near = [...DATA].sort((a,b)=>Math.abs(a.ypg-ypg)-Math.abs(b.ypg-ypg)).slice(0,6).sort((a,b)=>a.ypg-b.ypg);
+  const nearSet = new Set(near);
+  const rank = DATA.filter(d=>d.ypg<ypg).length+1;
+  const ticks = sorted.map(d=>`<div class="tick${nearSet.has(d)?" near":""}" style="left:${pos(d.ypg)}%" title="${esc(d.name)}：${fmt(d.ypg)}円/g"></div>`).join("");
+  const list = near.map((d,i)=>{
+    const diff = d.ypg-ypg, ds = scoreOf(d.ypg);
+    const rel = Math.abs(diff)<0.05?"ほぼ同じ":(diff<0?`${fmt(-diff)}円/g 安い`:`${fmt(diff)}円/g 高い`);
+    return `<li tabindex="0" data-i="${DATA.indexOf(d)}"><div><div class="nm">${esc(d.name)}</div><div class="cat">${esc(d.cat)}　${d.price}円・${d.p}g</div></div>
+    <div><div class="nv">${ds}点</div><div class="nd">${fmt(d.ypg)}円/g・${rel}</div></div></li>`;}).join("");
+  out.innerHTML = `
+  <div class="score-row">
+    <div class="score">${s}<small>点</small></div>
+    <div class="verdict">
+      <span class="grade" style="background:${col}">${g}</span>
+      <p class="yen">${fmt(ypg)} 円 / タンパク質1g</p>
+      <p class="note">${esc(name)}は107品中 ${rank}位相当。${verdictOf(s)}</p>
+    </div>
+  </div>
+  <div class="scale" aria-hidden="true">
+    <div class="scale-cap"><span>安い（コスパ良）</span><span>高い</span></div>
+    <div class="track"></div>
+    <div class="ticks" style="top:22px;height:46px">${ticks}</div>
+    <div class="you" style="left:${pos(ypg)}%;top:16px"><span>${esc(name.length>10?name.slice(0,10)+"…":name)}</span><i></i></div>
+    <div class="axis">${[10,15,20,30,40,60].map(v=>`<span style="left:${pos(v)}%">${v}${v===60?"+":""}</span>`).join("")}</div><div class="axis-unit">円 / タンパク質1g</div>
+  </div>
+  <h2>点数が近い商品</h2>
+  <ul class="near-list">${list}</ul>
+  <p class="hint">商品をタップすると、その値段とタンパク質量で入れ直します。</p>
+  <div class="save-row"><button class="btn" id="save">この商品を記録</button><span class="status" id="savestatus" role="status"></span></div>`;
+  current = {name: $("name").value.trim() || "(名前なし)", price, protein: p, ypg: Math.round(ypg*100)/100, score: s, grade: g};
+  $("save").addEventListener("click", saveCurrent);
+  out.querySelectorAll(".near-list li").forEach(li=>{
+    const pick=()=>{const d=DATA[+li.dataset.i];$("name").value=d.name;$("price").value=d.price;$("protein").value=d.p;render();};
+    li.addEventListener("click",pick);
+    li.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
+  });
+}
+["name","price","protein"].forEach(id=>$(id).addEventListener("input",render));
+
+/* ---- storage: per-person rows in db; localStorage if db is unavailable ---- */
+let current = null, entries = [], store = null;
+const LS = "protein-cost-entries";
+const pad = n => String(n).padStart(2,"0");
+const stamp = iso => {const d=new Date(iso);return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;};
+
+function renderLog(){
+  const box=$("log");
+  $("dl").hidden = !(entries.length && dlApi && window.XLSX);
+  if(!entries.length){box.innerHTML='<p class="empty">まだ記録はありません。判定したあと「この商品を記録」を押すと、ここに貯まります。</p>';return;}
+  const rows=[...entries].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(e=>`<tr>
+    <td>${stamp(e.createdAt)}</td><td class="name">${esc(e.name)}</td><td class="n">${e.price}円</td><td class="n">${e.protein}g</td>
+    <td class="n">${fmt(e.ypg)}</td><td class="n">${e.score}点</td><td>${esc(e.grade)}</td>
+    <td><button class="del" data-id="${esc(e.id)}" aria-label="${esc(e.name)}を削除">削除</button></td></tr>`).join("");
+  box.innerHTML=`<div class="table-wrap"><table><thead><tr><th>日時</th><th>商品名</th><th>価格</th><th>タンパク質</th><th>円/g</th><th>点数</th><th>ランク</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  box.querySelectorAll(".del").forEach(b=>b.addEventListener("click",()=>removeEntry(b.dataset.id)));
+}
+
+const local = {
+  async load(){try{entries=JSON.parse(localStorage.getItem(LS)||"[]");}catch(e){entries=[];} renderLog();},
+  async add(e){entries.push(e);try{localStorage.setItem(LS,JSON.stringify(entries));}catch(_){} renderLog();},
+  async remove(id){entries=entries.filter(e=>e.id!==id);try{localStorage.setItem(LS,JSON.stringify(entries));}catch(_){} renderLog();}
+};
+store = local; local.load();
+
+async function saveCurrent(){
+  if(!current) return;
+  const btn=$("save"), st=$("savestatus");
+  btn.disabled=true; st.textContent="記録しています…";
+  const e={...current, id: Date.now().toString(36)+Math.random().toString(36).slice(2,7), createdAt:new Date().toISOString()};
+  try{ await store.add(e); st.textContent="記録しました"; }
+  catch(err){ st.textContent="記録できませんでした（"+(err&&err.code||"エラー")+"）。もう一度押してください"; btn.disabled=false; return; }
+  setTimeout(()=>{ if($("save")) $("save").disabled=false; },800);
+}
+async function removeEntry(id){
+  try{ await store.remove(id); }catch(err){ $("dlstatus").textContent="削除できませんでした（"+(err&&err.code||"エラー")+"）"; }
+}
+
+const dlApi=true; renderLog();
+
+$("dl").addEventListener("click", async ()=>{
+  const st=$("dlstatus");
+  if(!dlApi||!window.XLSX){st.textContent="この画面ではダウンロードできません";return;}
+  const rows=[...entries].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  const aoa=[["日時","商品名","税込価格(円)","タンパク質(g)","円/タンパク質1g","点数","ランク"]];
+  rows.forEach((e,i)=>{const r=i+2;aoa.push([stamp(e.createdAt),e.name,e.price,e.protein,{f:`C${r}/D${r}`,v:e.price/e.protein},e.score,e.grade]);});
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=[{wch:17},{wch:36},{wch:12},{wch:13},{wch:15},{wch:7},{wch:7}];
+  for(let r=2;r<=rows.length+1;r++){const c=ws["E"+r]; if(c) c.z="0.0";}
+  ws["!autofilter"]={ref:`A1:G${rows.length+1}`};
+  const note=XLSX.utils.aoa_to_sheet([["点数＝ファミマ107商品のうち、1gあたりの値段がこの商品より高い商品の割合（100点が最良）"],["記録はこの端末のブラウザ内に保存されます（他の端末とは共有されません）。<br>比較データ：ファミリーマート公式サイトの税込通常価格・栄養成分（2026年10月時点）"]]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"記録");
+  XLSX.utils.book_append_sheet(wb,note,"説明");
+  const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  const d=new Date();
+  try{
+    XLSX.writeFile(wb,`タンパク質コスパ記録_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.xlsx`);
+    st.textContent="Excelファイルをダウンロードしました";
+  }catch(err){ st.textContent="ダウンロードできませんでした"; }
+});
+</script>
+</body>
+</html>
