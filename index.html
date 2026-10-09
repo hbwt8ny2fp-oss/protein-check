@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>タンパク質コスパ判定</title>
+<meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#EEF2F1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -85,6 +86,21 @@ td.name{white-space:normal;min-width:140px}
 .del{background:none;border:0;color:var(--sub);cursor:pointer;font-size:.8rem;padding:4px 6px;border-radius:6px}
 .del:hover{color:var(--bad)}
 .del:focus-visible{outline:2px solid var(--ink)}
+.rank{margin-top:22px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px}
+.rank summary{cursor:pointer;font-weight:700;font-size:1.02rem;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.rank summary::-webkit-details-marker{display:none}
+.rank summary::after{content:"開く";white-space:nowrap;margin-left:10px;font-size:.8rem;color:var(--sub);font-weight:500}
+.rank[open] summary::after{content:"閉じる"}
+.rank summary:focus-visible{outline:2px solid var(--ink);outline-offset:4px;border-radius:4px}
+.rank-ctrl{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:14px 0 6px;font-size:.88rem}
+.rank-ctrl select{font-family:var(--sans);font-size:.9rem;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+.rank-ctrl label{display:flex;gap:6px;align-items:center;margin:0;color:var(--ink);font-size:.88rem}
+.rank-list{list-style:none;margin:8px 0 0;padding:0}
+.rank-list li{display:grid;grid-template-columns:2.6em 1fr auto;gap:10px;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line)}
+.rank-list .no{font-family:var(--num);font-weight:700;font-size:1.1rem;color:var(--sub);text-align:right}
+.rank-list li.mine{background:color-mix(in srgb,var(--good) 12%,transparent);border-radius:6px}
+.rank-list li.mine .nm::before{content:"記録";font-size:.68rem;font-weight:700;color:#fff;background:var(--good);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+.rank-count{color:var(--sub);font-size:.8rem}
 footer{color:var(--sub);font-size:.78rem;margin-top:30px;line-height:1.7}
 @media (max-width:480px){.score{font-size:4.6rem}}
 @media (max-width:520px){
@@ -139,6 +155,16 @@ footer{color:var(--sub);font-size:.78rem;margin-top:30px;line-height:1.7}
   <div id="log"><p class="empty">まだ記録はありません。判定したあと「この商品を記録」を押すと、ここに貯まります。</p></div>
   <p class="status" id="dlstatus" role="status"></p>
 </section>
+
+<details class="rank" id="rankbox">
+  <summary>タンパク質1gあたりの値段ランキング</summary>
+  <div class="rank-ctrl">
+    <select id="rankcat" aria-label="カテゴリで絞り込む"><option value="">すべてのカテゴリ</option></select>
+    <label><input type="checkbox" id="rankmine" checked style="width:auto;font-size:1rem">自分の記録も並べる</label>
+    <span class="rank-count" id="rankcount"></span>
+  </div>
+  <ol class="rank-list" id="ranklist"></ol>
+</details>
 
 <footer>
 点数は「1gあたりの値段が、比較対象の何%の商品より安いか」です（100点＝全商品より安い、50点＝ちょうど真ん中）。<br>
@@ -215,6 +241,23 @@ function render(){
 }
 ["name","price","protein"].forEach(id=>$(id).addEventListener("input",render));
 
+
+/* ---- ranking ---- */
+(()=>{const sel=$("rankcat");[...new Set(DATA.map(d=>d.cat))].forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;sel.appendChild(o);});})();
+function renderRank(){
+  const cat=$("rankcat").value, mine=$("rankmine").checked;
+  let items=DATA.filter(d=>!cat||d.cat===cat).map(d=>({name:d.name,cat:d.cat,price:d.price,p:d.p,ypg:d.ypg,mine:false}));
+  if(mine && !cat) items=items.concat(entries.map(e=>({name:e.name,cat:"自分の記録",price:e.price,p:e.protein,ypg:e.price/e.protein,mine:true})));
+  items.sort((a,b)=>a.ypg-b.ypg);
+  $("rankcount").textContent=items.length+"品";
+  let no=0,prev=null;
+  $("ranklist").innerHTML=items.map((d,i)=>{ if(prev===null||Math.abs(d.ypg-prev)>1e-9){no=i+1;prev=d.ypg;}
+    return `<li class="${d.mine?"mine":""}"><span class="no">${no}</span><div><div class="nm">${esc(d.name)}</div><div class="cat">${esc(d.cat)}　${d.price}円・${d.p}g</div></div>
+    <div><div class="nv">${fmt(d.ypg)}<small style="font-size:.7em;font-weight:500">円/g</small></div><div class="nd">${scoreOf(d.ypg)}点</div></div></li>`;}).join("");
+}
+$("rankcat").addEventListener("change",renderRank);
+$("rankmine").addEventListener("change",renderRank);
+
 /* ---- storage: per-person rows in db; localStorage if db is unavailable ---- */
 let current = null, entries = [], store = null;
 const LS = "protein-cost-entries";
@@ -222,6 +265,7 @@ const pad = n => String(n).padStart(2,"0");
 const stamp = iso => {const d=new Date(iso);return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;};
 
 function renderLog(){
+  if(typeof renderRank==="function") renderRank();
   const box=$("log");
   $("dl").hidden = !(entries.length && dlApi && window.XLSX);
   if(!entries.length){box.innerHTML='<p class="empty">まだ記録はありません。判定したあと「この商品を記録」を押すと、ここに貯まります。</p>';return;}
